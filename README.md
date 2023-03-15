@@ -7,6 +7,10 @@ Golang 1.18
 
 ## Structure
 * [Crypto](#Crypto)
+* [UTXO](#UTXO)
+* [Block](#Block)
+* [Blockchain](#Blockchain)
+* [GRpc](#GRPC)
 
 ## Installation
 ```azure
