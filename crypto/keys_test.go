@@ -7,10 +7,10 @@ import (
 
 func TestGeneratePrivateKey(t *testing.T) {
 	prvKey := GeneratePrivateKey()
-	assert.Equal(t, privateKeyLen, len(prvKey.Bytes()))
+	assert.Equal(t, PrivateKeyLen, len(prvKey.Bytes()))
 
 	pubKey := prvKey.PublicKey()
-	assert.Equal(t, pubKeyLen, len(pubKey.Bytes()))
+	assert.Equal(t, PubKeyLen, len(pubKey.Bytes()))
 }
 
 func TestPrivateKeySign(t *testing.T) {
@@ -30,7 +30,7 @@ func TestPublicKeyAddress(t *testing.T) {
 	prv := GeneratePrivateKey()
 	pub := prv.PublicKey()
 	addr := pub.Address()
-	assert.Equal(t, addressLen, len(addr.Bytes()))
+	assert.Equal(t, AddressLen, len(addr.Bytes()))
 
 	t.Log("address:", addr.String())
 }

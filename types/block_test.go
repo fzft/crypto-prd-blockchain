@@ -21,4 +21,11 @@ func TestSignBlock(t *testing.T) {
 
 	assert.Equal(t, 64, len(sig.Bytes()))
 	assert.True(t, sig.Verify(HashBlock(block), pubKey))
+	assert.Equal(t, block.Signature, sig.Bytes())
+}
+
+func TestVerifyBlock(t *testing.T) {
+	block := util.RandomBlock()
+	SignBlock(crypto.GeneratePrivateKey(), block)
+	assert.True(t, VerifyBlock(block))
 }
