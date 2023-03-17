@@ -2,6 +2,7 @@ package node
 
 import (
 	"encoding/hex"
+	"fmt"
 	"github.com/fzft/crypto-prd-blockchain/crypto"
 	"github.com/fzft/crypto-prd-blockchain/proto"
 	"github.com/fzft/crypto-prd-blockchain/types"
@@ -62,12 +63,17 @@ func TestAddBlockWithTx(t *testing.T) {
 		chain     = NewChain(NewMemoryBlockStore(), NewMemoryTxStore())
 		b         = randomBlock(t, chain)
 		prvKey    = crypto.GeneratePrivateKeyFromSeedStr(godSeed)
-		recipient = crypto.GeneratePrivateKey().PublicKey().Bytes()
+		recipient = crypto.GeneratePrivateKey().PublicKey().Address().Bytes()
 	)
+
+	// hard code for genesis block
+	prevTx, err := chain.txStore.Get("28706e21cb96f758ee855577b6111cb8788d9b4c9eead5e19c09baa05ee16d90")
 
 	inputs := []*proto.TxInput{
 		{
-			PublicKey: prvKey.PublicKey().Bytes(),
+			PublicKey:    prvKey.PublicKey().Bytes(),
+			PrevOutIndex: 0,
+			PrevTxHash:   types.HashTransaction(prevTx),
 		},
 	}
 	outputs := []*proto.TxOutput{
@@ -86,11 +92,66 @@ func TestAddBlockWithTx(t *testing.T) {
 		Inputs:  inputs,
 		Outputs: outputs,
 	}
+
+	sig := types.SignTransaction(prvKey, tx)
+	tx.Inputs[0].Signature = sig.Bytes()
+
 	b.Transactions = append(b.Transactions, tx)
 	require.Nil(t, chain.AddBlock(b))
 
+	// check if all the outputs are unspent y querying the utxo store
 	txHash := hex.EncodeToString(types.HashTransaction(tx))
 	fetchedTx, err := chain.txStore.Get(txHash)
 	require.Nil(t, err)
 	assert.Equal(t, tx, fetchedTx)
+
+	for i := 0; i < len(tx.Outputs); i++ {
+		key := fmt.Sprintf("%s_%d", txHash, i)
+		utxo, err := chain.utxoStore.Get(key)
+		require.Nil(t, err)
+		assert.Equal(t, txHash, utxo.Hash)
+		assert.True(t, !utxo.Spent)
+	}
+}
+
+func TestAddBlockWithTxInsufficientFunds(t *testing.T) {
+	var (
+		chain     = NewChain(NewMemoryBlockStore(), NewMemoryTxStore())
+		b         = randomBlock(t, chain)
+		prvKey    = crypto.GeneratePrivateKeyFromSeedStr(godSeed)
+		recipient = crypto.GeneratePrivateKey().PublicKey().Address().Bytes()
+	)
+
+	// hard code for genesis block
+	prevTx, _ := chain.txStore.Get("28706e21cb96f758ee855577b6111cb8788d9b4c9eead5e19c09baa05ee16d90")
+
+	inputs := []*proto.TxInput{
+		{
+			PublicKey:    prvKey.PublicKey().Bytes(),
+			PrevOutIndex: 0,
+			PrevTxHash:   types.HashTransaction(prevTx),
+		},
+	}
+	outputs := []*proto.TxOutput{
+		{
+			Amount:  10001,
+			Address: recipient,
+		},
+		{
+			Amount:  1,
+			Address: prvKey.PublicKey().Address().Bytes(),
+		},
+	}
+
+	tx := &proto.Transaction{
+		Version: 1,
+		Inputs:  inputs,
+		Outputs: outputs,
+	}
+
+	sig := types.SignTransaction(prvKey, tx)
+	tx.Inputs[0].Signature = sig.Bytes()
+
+	b.Transactions = append(b.Transactions, tx)
+	require.Nil(t, chain.AddBlock(b))
 }

@@ -42,14 +42,22 @@ func (l *HeaderList) Height() int {
 	return l.Len() - 1
 }
 
+type UTXO struct {
+	Hash     string
+	OutIndex int
+	Amount   int64
+	Spent    bool
+}
+
 type Chain struct {
 	blockStore BlockStore
 	txStore    TxStore
 	headers    *HeaderList
+	utxoStore  UTXOSore
 }
 
 func NewChain(bs BlockStore, ts TxStore) *Chain {
-	chain := &Chain{blockStore: bs, headers: NewHeaderList(), txStore: ts}
+	chain := &Chain{blockStore: bs, headers: NewHeaderList(), txStore: ts, utxoStore: NewMemoryUTXOStore()}
 	chain.addBlock(createGenesisBlock())
 	return chain
 }
@@ -100,6 +108,39 @@ func (c *Chain) ValidateBlock(block *proto.Block) error {
 	if !bytes.Equal(hash, block.Header.PrevHash) {
 		return fmt.Errorf("block hash does not match previous block hash")
 	}
+
+	for _, tx := range block.Transactions {
+		if err = c.validateTransaction(tx); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// validateTransaction validates a transaction
+func (c *Chain) validateTransaction(tx *proto.Transaction) error {
+	if !types.VerifyTransaction(tx) {
+		return fmt.Errorf("invalid tx signature")
+	}
+
+	//validate if the inputs are valid
+	nInputs := len(tx.Inputs)
+	for i := 0; i < nInputs; i++ {
+		preTxHash := hex.EncodeToString(tx.Inputs[i].PrevTxHash)
+		key := fmt.Sprintf("%s_%d", preTxHash, i)
+		utxo, err := c.utxoStore.Get(key)
+		if err != nil {
+			return err
+		}
+		if utxo.Spent {
+			return fmt.Errorf("output %d of tx %s is already spent", i, preTxHash)
+		}
+
+		//TODO(fzft): validate if the amount is correct
+
+	}
+
 	return nil
 }
 
@@ -111,6 +152,23 @@ func (c *Chain) addBlock(block *proto.Block) error {
 		if err := c.txStore.Put(tx); err != nil {
 			return err
 		}
+
+		hash := hex.EncodeToString(types.HashTransaction(tx))
+
+		// address_txHash
+		for it, output := range tx.Outputs {
+			utxo := &UTXO{
+				Hash:     hash,
+				OutIndex: it,
+				Amount:   output.Amount,
+				Spent:    false,
+			}
+
+			if err := c.utxoStore.Put(utxo); err != nil {
+				return err
+			}
+		}
+
 	}
 
 	return c.blockStore.Put(block)
@@ -133,7 +191,7 @@ func createGenesisBlock() *proto.Block {
 		Outputs: []*proto.TxOutput{
 			{
 				Amount:  1000,
-				Address: prvKey.PublicKey().Bytes(),
+				Address: prvKey.PublicKey().Address().Bytes(),
 			},
 		},
 	}

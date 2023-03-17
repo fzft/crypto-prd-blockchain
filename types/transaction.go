@@ -24,6 +24,10 @@ func HashTransaction(tx *proto.Transaction) []byte {
 // VerifyTransaction verifies the transaction.
 func VerifyTransaction(tx *proto.Transaction) bool {
 	for _, input := range tx.Inputs {
+		if len(input.Signature) == 0 {
+			panic("the transaction has no signature")
+		}
+
 		sig := crypto.SignatureFromBytes(input.Signature)
 
 		// TODO: this is a hack, we should not modify the transaction

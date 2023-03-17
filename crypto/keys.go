@@ -118,3 +118,11 @@ func (a Address) Bytes() []byte {
 func (a Address) String() string {
 	return hex.EncodeToString(a.addr)
 }
+
+// AddressFromBytes returns an address from a byte slice.
+func AddressFromBytes(addr []byte) Address {
+	if len(addr) != AddressLen {
+		panic("invalid address length, must be 20 bytes")
+	}
+	return Address{addr: addr}
+}

@@ -18,6 +18,11 @@ type BlockStore interface {
 	Get(string) (*proto.Block, error)
 }
 
+type UTXOSore interface {
+	Put(utxo *UTXO) error
+	Get(string) (*UTXO, error)
+}
+
 type MemoryBlockStore struct {
 	blocks *util.KeyValueStore[string, *proto.Block]
 }
@@ -64,4 +69,29 @@ func (m *MemoryTxStore) Get(hash string) (*proto.Transaction, error) {
 		return nil, fmt.Errorf("transaction with hash %s not found", hash)
 	}
 	return tx, nil
+}
+
+type MemoryUTXOStore struct {
+	utxos *util.KeyValueStore[string, *UTXO]
+}
+
+func NewMemoryUTXOStore() *MemoryUTXOStore {
+	return &MemoryUTXOStore{
+		utxos: util.NewKeyValueStore[string, *UTXO](),
+	}
+}
+
+func (m *MemoryUTXOStore) Put(utxo *UTXO) error {
+	key := fmt.Sprintf("%s_%d", utxo.Hash, utxo.OutIndex)
+
+	m.utxos.Put(key, utxo)
+	return nil
+}
+
+func (m *MemoryUTXOStore) Get(hash string) (*UTXO, error) {
+	utxo, ok := m.utxos.Get(hash)
+	if !ok {
+		return nil, fmt.Errorf("utxo with hash %s not found", hash)
+	}
+	return utxo, nil
 }
